@@ -1,5 +1,6 @@
 import os
 os.system('cls')
+import test
 
 
 age = int(input('masukan umur : '))
