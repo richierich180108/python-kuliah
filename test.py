@@ -1,72 +1,89 @@
-import os
-from typing import List, Tuple
-import time
-import pert_8
+# ==========================================================
+# Kuliah 13 - Latihan Confidence Interval (estimasi interval) untuk mean
+# ==========================================================
+# Bentuk umum interval kepercayaan untuk mean populasi (μ):
+#       X̄ - E  <=  μ  <=  X̄ + E
+# dengan margin error:
+#       E = nilai_kritis * (simpangan_baku / akar(n))
+#
+# Memilih nilai kritis:
+#   - Z (distribusi normal)   -> σ populasi diketahui, atau n >= 30 (aturan slide 18)
+#   - t (distribusi Student)  -> σ tidak diketahui dan n < 30, dengan df = n - 1
+# ==========================================================
 
-os.system('cls')
+import math                  # untuk akar kuadrat: math.sqrt()
+from scipy import stats      # untuk mencari nilai Z dan t (pengganti membaca tabel)
+import os                    # untuk membersihkan layar terminal
+os.system('cls')             # 'cls' = clear screen di Windows (di Mac/Linux pakai 'clear')
 
-def findv1(L: list[float])->Tuple[int,int]:
-    smallest = min(L)
-    min1 = L.index(smallest)
-    L.remove(smallest)
-    next_smallest = min(L)
-    min2 = L.index(next_smallest)
 
-    if min1 <= min2:
-        min2+=1
-    return (min1,min2)
+def ci_mean(xbar, sebaran, n, conf, pakai_t=False):
+    """Menghitung confidence interval untuk mean.
 
-def findv2(L: list[float])->Tuple[int,int]:
-    temp_list = sorted(L)
-    smallest = temp_list[0]
-    next_smallest = temp_list[1]
-    min1 = L.index(smallest)
-    min2 = L.index(next_smallest)
-    return (min1,min2)
+    xbar    : rata-rata sampel (X̄)
+    sebaran : sigma (populasi) kalau pakai Z, atau s (sampel) kalau pakai t
+    n       : jumlah sampel
+    conf    : tingkat keyakinan dalam desimal (99% -> 0.99)
+    pakai_t : False = pakai Z (normal), True = pakai t
 
-def findv3(L: list[float])->Tuple[int,int]:
-    if L[0] < L[1]:
-        min1, min2 = 0,1
+    Mengembalikan 4 nilai: nilai kritis, margin error, batas bawah, batas atas.
+    """
+    # alpha = peluang "meleset". Keyakinan 95% -> alpha = 0.05
+    alpha = 1 - conf
+
+    if pakai_t:
+        # ppf = kebalikan tabel: kita masukkan luas area, hasilnya nilai kritis.
+        # Dipakai 1 - alpha/2 karena alpha dibagi dua ekor (kiri dan kanan).
+        # df (derajat kebebasan) = n - 1
+        kritis = stats.t.ppf(1 - alpha / 2, df=n - 1)
     else:
-        min1,min2 = 1,0
-    for i in range(2,len(L)):
-        if L[i]<L[min1]:
-            min2=min1
-            min1=i
-        elif L[i]<L[min2]:
-            min2 = i
-    return (min1,min2)
+        # Sama seperti di atas, tapi dari distribusi normal baku (Z), tanpa df
+        kritis = stats.norm.ppf(1 - alpha / 2)
 
-if __name__ == '__main__':
-    dataset1 = []
-    dataset2 =[]
-    dataset3 = []
-    
-    dataset_file = open('data.txt','r')
-    for line in dataset_file:
-        dataset1.append(float(line))
-        dataset2.append(float(line))
-        dataset3.append(float(line))
-    dataset_file.close()
+    # Margin error: E = nilai kritis * sebaran / akar(n)
+    E = kritis * sebaran / math.sqrt(n)
 
-    t1 = time.perf_counter()
-    minv11, minv12 = findv1(dataset1)
-    t2 = time.perf_counter()
-    total_timev1 = (t2-t1) * 1000
-
-    t1 = time.perf_counter()
-    minv21, minv22 = findv2(dataset2)
-    t2 = time.perf_counter()
-    total_timev2 = (t2-t1) * 1000
-
-    t1 = time.perf_counter()
-    minv31, minv32 = findv3(dataset3)
-    t2 = time.perf_counter()
-    total_timev3 = (t2-t1) * 1000
+    # Batas bawah = X̄ - E, batas atas = X̄ + E
+    return kritis, E, xbar - E, xbar + E
 
 
-    print("Cara 1: {0:.2f}ms, hasilnya = {1}, {2}".format(total_timev1,minv11,minv12)) 
-    print("Cara 2: {0:.2f}ms, hasilnya = {1}, {2}".format(total_timev2,minv21,minv22)) 
-    print("Cara 3: {0:.2f}ms, hasilnya = {1}, {2}".format(total_timev3,minv31,minv32)) 
+def cetak(judul, hasil, satuan=""):
+    # 'hasil' berisi 4 nilai dari ci_mean, dibongkar ke 4 variabel sekaligus
+    kritis, E, bawah, atas = hasil
+    print(judul)
+    # :.4f artinya tampilkan 4 angka di belakang koma
+    print(f"  nilai kritis = {kritis:.4f}")
+    print(f"  margin error = {E:.4f} {satuan}")
+    print(f"  interval     = {bawah:.4f} <= μ <= {atas:.4f} {satuan}\n")
 
 
+# ----------------------------------------------------------
+# SOAL 1: n=144, X̄=20000, σ=6000 (σ populasi diketahui) -> pakai Z
+# Diminta: CI 99% dan 90%, lalu interpretasi
+# (angka 20_000 sama dengan 20000, garis bawah hanya supaya mudah dibaca)
+# ----------------------------------------------------------
+cetak("SOAL 1a (99%)", ci_mean(20_000, 6_000, 144, 0.99), "rupiah")
+cetak("SOAL 1b (90%)", ci_mean(20_000, 6_000, 144, 0.90), "rupiah")
+print('SOAL 1c Interpretasi \ndengan tingkat keyakinan 99%, rata-rata pengeluaran per hari seluruh karyawan diduga berada di antara Rp18.712 dan Rp21.288. Kalau pengambilan sampel diulang banyak kali, sekitar 99% interval yang terbentuk akan memuat μ yang sebenarnya. Interval 90% lebih sempit tetapi keyakinannya lebih rendah. Jadi ada pertukaran antara keyakinan dan presisi.\n')
+
+# ----------------------------------------------------------
+# SOAL 2: n=100, X̄=9600, s=160 (simpangan baku sampel)
+# σ tidak diketahui, tapi n >= 30 -> pakai Z (aturan slide 18)
+# Baris kedua memakai t hanya sebagai pembanding: hasilnya sedikit lebih lebar
+# ----------------------------------------------------------
+cetak("SOAL 2 (98%, Z)", ci_mean(9_600, 160, 100, 0.98), "rupiah")
+cetak("SOAL 2 (98%, t, pembanding)", ci_mean(9_600, 160, 100, 0.98, pakai_t=True), "rupiah")
+
+# ----------------------------------------------------------
+# SOAL 3: n=60, X̄=7.72, σ=0.73 (σ populasi diketahui) -> pakai Z
+# Satuannya persen, jadi hasil interval juga dalam persen
+# ----------------------------------------------------------
+cetak("SOAL 3 (95%)", ci_mean(7.72, 0.73, 60, 0.95), "%")
+
+# ----------------------------------------------------------
+# SOAL 4: n=25, X̄=20, s=8 (dianggap simpangan baku sampel)
+# n < 30 dan σ tidak diketahui -> pakai t (df = 24)
+# Baris kedua memakai Z hanya sebagai pembanding (kalau 8% dianggap σ populasi)
+# ----------------------------------------------------------
+cetak("SOAL 4 (99%, t)", ci_mean(20, 8, 25, 0.99, pakai_t=True), "%")
+cetak("SOAL 4 (99%, Z, pembanding)", ci_mean(20, 8, 25, 0.99), "%")
